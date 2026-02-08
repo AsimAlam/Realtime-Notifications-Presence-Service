@@ -1,4 +1,10 @@
 <!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>WS Test</title>
+</head>
+<body>
 <h3>Realtime Notify - Test Client</h3>
 <div>
     <label>Username: <input id="username" value="alice" /></label>
@@ -31,9 +37,9 @@
 
     document.getElementById('connect').onclick = ()=>{
         if (!token) { alert('get token first'); return; }
-        const socket = new SockJS('/ws');
+        const socket = new SockJS('/ws?token=' + encodeURIComponent(token.replace('Bearer ', '')));
         client = Stomp.over(socket);
-        client.connect({Authorization: 'Bearer ' + token}, (frame)=>{
+        client.connect({Authorization: token}, (frame)=>{
             log('connected: ' + frame);
             client.subscribe('/user/queue/messages', (m)=>{ log('[private] '+m.body); });
             client.subscribe('/topic/announcements', (m)=>{ log('[topic] '+m.body); });
