@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Realtime Client</title>
+
+    <!-- Polyfills that must run before any module code -->
+    <script>
+      // Ensure Node-like globals the legacy libs expect
+      if (typeof window.global === 'undefined') {
+        window.global = window;
+      }
+      if (typeof window.process === 'undefined') {
+        window.process = { env: {} };
+      }
+      if (typeof window.Buffer === 'undefined') {
+        // minimal Buffer shim for libs that check Buffer presence
+        window.Buffer = window.Buffer || { isBuffer: () => false };
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
