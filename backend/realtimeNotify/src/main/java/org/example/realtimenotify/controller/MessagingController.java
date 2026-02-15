@@ -4,6 +4,8 @@ import java.security.Principal;
 import org.example.realtimenotify.model.Notification;
 import org.example.realtimenotify.service.NotificationService;
 import org.example.realtimenotify.service.RateLimiterService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
@@ -17,6 +19,8 @@ public class MessagingController {
   private final NotificationService notificationService;
   private final RateLimiterService rateLimiterService;
 
+  private final Logger log = LoggerFactory.getLogger(MessagingController.class);
+
   public MessagingController(
       SimpMessagingTemplate template,
       NotificationService notificationService,
@@ -27,17 +31,15 @@ public class MessagingController {
   }
 
   @MessageMapping("/send")
-  public void handleMessage(
-      @Payload ClientMessage msg, Principal principal, SimpMessageHeaderAccessor accessor) {
+  public void handleMessage(@Payload ClientMessage msg, Principal principal) {
     String from = (principal != null) ? principal.getName() : "anonymous";
-    // basic rate-limit
-    if (!rateLimiterService.allow(from)) {
-      // drop or send a rate-limited notice
-      return;
-    }
+    log.info("STOMP /send received - from={}, to={}, content={}", from, msg.getToUserId(), msg.getContent());
     Notification n = notificationService.saveNotification(msg.getToUserId(), msg.getContent());
-    template.convertAndSendToUser(msg.getToUserId(), "/queue/messages", n);
+    log.info("Sending via convertAndSendToUser to={} id={}", msg.getToUserId(), n.getId());
+    template.convertAndSendToUser(msg.getToUserId(), "/queue/notifications", n);
   }
+
+
 
   @MessageMapping("/broadcast")
   public void broadcast(@Payload BroadcastMessage message) {
@@ -50,6 +52,29 @@ public class MessagingController {
     if (principal == null) return;
     String user = principal.getName();
     notificationService.replayMissed(user, req.getLastSeenSeq(), template);
+  }
+
+  @MessageMapping("/ack")
+  public void handleAck(@Payload AckMessage ack, Principal principal) {
+    // AckMessage contains notificationId and seq
+    if (ack.getNotificationId() != null) {
+      notificationService.markDelivered(ack.getNotificationId());
+    } else if (ack.getToUserId() != null && ack.getSeq() != null) {
+      // optional: mark by user+seq
+      // Add repository method to find by toUserId + seq if needed
+    }
+  }
+  public static class AckMessage {
+    private Long notificationId;
+    private Long seq;
+    private String toUserId;
+    // getters/setters
+    public Long getNotificationId() { return notificationId; }
+    public void setNotificationId(Long notificationId) { this.notificationId = notificationId; }
+    public Long getSeq() { return seq; }
+    public void setSeq(Long seq) { this.seq = seq; }
+    public String getToUserId(){return toUserId;}
+    public void setToUserId(String s){this.toUserId=s;}
   }
 
   // DTOs used by client
